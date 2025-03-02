@@ -28,6 +28,15 @@ export class FormattedContentBuilder {
   }
 
   addToken(token: string, offset: number): void {
+    // Special case: no space before semicolons
+    if (token === ';') {
+      this.#softSpace = false;
+      this.#appendFormatting();
+      this.#addMappingIfNeeded(offset);
+      this.#addText(token);
+      return;
+    }
+    
     // Skip the regex check if `addSoftSpace` will be a no-op.
     if (!this.#hardSpaces && !this.#softSpace) {
       const lastCharOfLastToken = this.#formattedContent.at(-1)?.at(-1) ?? '';
@@ -39,9 +48,13 @@ export class FormattedContentBuilder {
       const lastItem = this.#formattedContent.length > 0 ? this.#formattedContent[this.#formattedContent.length - 1] : '';
       const isAfterReturn = lastItem === 'return';
       
+      // Check if we're after a left parenthesis
+      const isAfterParen = lastCharOfLastToken === '(';
+      
       // Add space between identifiers/numbers or for special operators
       // Special operators like 'instanceof' always need spaces, even in template literals
-      if (isSpecialOperator || 
+      // But don't add space after opening parenthesis
+      if ((isSpecialOperator && !isAfterParen) || 
           isAfterReturn || 
           (this.#enforceSpaceBetweenWords && this.#canBeIdentifierOrNumber.test(lastCharOfLastToken) && this.#canBeIdentifierOrNumber.test(token))) {
         this.addSoftSpace();
