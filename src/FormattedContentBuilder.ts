@@ -13,6 +13,8 @@ export class FormattedContentBuilder {
   #hardSpaces = 0;
   #cachedIndents = new Map<number, string>();
   #canBeIdentifierOrNumber = /[$\u200C\u200D\p{ID_Continue}]/u;
+  // List of operators that should always have spaces around them
+  #specialOperators = ['instanceof', 'typeof', 'void', 'delete', 'in', 'of'];
 
   mapping = {original: [0], formatted: [0]};
 
@@ -27,9 +29,21 @@ export class FormattedContentBuilder {
 
   addToken(token: string, offset: number): void {
     // Skip the regex check if `addSoftSpace` will be a no-op.
-    if (this.#enforceSpaceBetweenWords && !this.#hardSpaces && !this.#softSpace) {
+    if (!this.#hardSpaces && !this.#softSpace) {
       const lastCharOfLastToken = this.#formattedContent.at(-1)?.at(-1) ?? '';
-      if (this.#canBeIdentifierOrNumber.test(lastCharOfLastToken) && this.#canBeIdentifierOrNumber.test(token)) {
+      
+      // Check if the token is a special operator that should always have spaces
+      const isSpecialOperator = this.#specialOperators.includes(token);
+      
+      // Check for 'return' keyword without joining the entire content
+      const lastItem = this.#formattedContent.length > 0 ? this.#formattedContent[this.#formattedContent.length - 1] : '';
+      const isAfterReturn = lastItem === 'return';
+      
+      // Add space between identifiers/numbers or for special operators
+      // Special operators like 'instanceof' always need spaces, even in template literals
+      if (isSpecialOperator || 
+          isAfterReturn || 
+          (this.#enforceSpaceBetweenWords && this.#canBeIdentifierOrNumber.test(lastCharOfLastToken) && this.#canBeIdentifierOrNumber.test(token))) {
         this.addSoftSpace();
       }
     }
@@ -39,6 +53,12 @@ export class FormattedContentBuilder {
     // Insert token.
     this.#addMappingIfNeeded(offset);
     this.#addText(token);
+    
+    // Add space after special operators - always, regardless of enforceSpaceBetweenWords
+    // This ensures operators like 'instanceof' always have spaces even in template literals
+    if (this.#specialOperators.includes(token)) {
+      this.addSoftSpace();
+    }
   }
 
   addSoftSpace(): void {
